@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+
+# Test output (folders are kept via .gitkeep, contents are ignored)
+test-results/*
+!test-results/.gitkeep
+reports/*
+!reports/.gitkeep
+screenshots/*
+!screenshots/.gitkeep
+playwright-report/
+blob-report/
+playwright/.cache/
+videos/
+
+# Secrets & environment files (only .env.example is committed)
+.env
+.env.*
+!.env.example
+config/*.env
+config/*.local.env
+
+# Generated auth state
+auth/*.json
+
+# Logs
+*.log
+npm-debug.log*

@@ -1,0 +1,37 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "types": ["node"],
+
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    // exactOptionalPropertyTypes is intentionally OFF: Playwright's own config
+    // types (workers/baseURL) are `string | number` / `string` without `undefined`,
+    // which makes the idiomatic `process.env.CI ? 4 : undefined` pattern fail.
+
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "sourceMap": true,
+    "noEmit": true
+  },
+  "include": [
+    "tests/**/*.ts",
+    "pages/**/*.ts",
+    "components/**/*.ts",
+    "fixtures/**/*.ts",
+    "utils/**/*.ts",
+    "playwright/**/*.ts",
+    "playwright.config.ts"
+  ],
+  "exclude": ["node_modules", "reports", "test-results", "screenshots"]
+}

@@ -1,0 +1,23 @@
+{
+  "_comment": "Products of the public, read-only store demo catalog (storedemo.testdino.com). No user-specific or secret data — safe to keep in the repository. Prices are USD integers as rendered by the store.",
+  "productA": {
+    "name": "Rode NT1-A Condenser Mic",
+    "price": 240,
+    "path": "/product/rode-nt1-a-condenser-mic"
+  },
+  "productB": {
+    "name": "JBL Charge 4 Bluetooth Speaker",
+    "price": 145,
+    "path": "/product/jbl-charge-4-bluetooth-speaker"
+  },
+  "messages": {
+    "addedToWishlist": "Added to the wishlist",
+    "removedFromWishlist": "Removed from wishlist",
+    "addedToCart": "Added to the cart"
+  },
+  "headings": {
+    "wishlist": "My Wishlist",
+    "cart": "Shopping Cart",
+    "emptyWishlist": "Your wishlist is empty"
+  }
+}

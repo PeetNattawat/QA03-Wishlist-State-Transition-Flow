@@ -1,0 +1,42 @@
+{
+  "name": "automation-testing",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Playwright + TypeScript automation testing framework (Web UI + API), multi-environment, POM-based.",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:debug": "playwright test --debug",
+    "test:chromium": "playwright test --project=chromium",
+    "test:firefox": "playwright test --project=firefox",
+    "test:webkit": "playwright test --project=webkit",
+    "test:smoke": "playwright test --grep @smoke",
+    "test:regression": "playwright test --grep @regression",
+    "report": "playwright show-report reports/html",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "keywords": [
+    "playwright",
+    "typescript",
+    "automation",
+    "qa"
+  ],
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "@types/node": "^26.1.2",
+    "dotenv": "^17.4.2",
+    "eslint": "^10.8.0",
+    "prettier": "^3.9.6",
+    "typescript": "~5.9",
+    "typescript-eslint": "^8.66.0"
+  }
+}
