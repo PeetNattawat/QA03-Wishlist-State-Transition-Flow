@@ -19,7 +19,10 @@ module.exports = tseslint.config(
       'eslint.config.js',
     ],
   },
-  ...tseslint.configs.strictTypeChecked,
+  // The type-aware preset MUST be scoped to *.ts: without `files`, its rules also
+  // load for plain .js files (e.g. scripts/setup.js), and every type-aware rule
+  // then crashes with "you have used a rule which requires type information".
+  ...tseslint.configs.strictTypeChecked.map((config) => ({ ...config, files: ['**/*.ts'] })),
   {
     files: ['**/*.ts'],
     languageOptions: {
@@ -65,6 +68,15 @@ module.exports = tseslint.config(
     files: ['fixtures/**/*.ts'],
     rules: {
       'no-empty-pattern': 'off',
+    },
+  },
+  {
+    // Plain CommonJS Node tooling (scripts/setup.js) — no type information, and
+    // console output is the whole point of a CLI setup script.
+    files: ['**/*.js'],
+    languageOptions: { sourceType: 'commonjs' },
+    rules: {
+      'no-console': 'off',
     },
   },
 );

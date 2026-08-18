@@ -8,6 +8,7 @@
     "node": ">=20"
   },
   "scripts": {
+    "setup": "node scripts/setup.js",
     "test": "playwright test",
     "test:headed": "playwright test --headed",
     "test:debug": "playwright test --debug",
