@@ -1,31 +1,27 @@
 # Automation Testing — Playwright + TypeScript
 
-Web UI **and** API automation framework for the QA team, built to
-`qa/guidelines/playwright-automation-setup.md`.
-Page Object Model, multi-environment, zero credentials in source control.
+Web UI automation for the **Wishlist → Cart** flow of a public demo store
+(`storedemo.testdino.com`). Page Object Model, strict TypeScript, zero
+credentials — the target app is credential-free.
 
 ---
 
 ## 1. Overview
 
-| Area     | Choice                                                               |
-| -------- | -------------------------------------------------------------------- |
-| Runner   | `@playwright/test` (auto-wait, trace viewer, HTML report)            |
-| Language | TypeScript, `strict: true` (+ `noUnusedLocals`, `noImplicitReturns`) |
-| Browsers | Chromium, Firefox, WebKit                                            |
-| Config   | `dotenv`, one file per environment, CI secrets in CI                 |
-| Quality  | ESLint (type-aware, `typescript-eslint` strict) + Prettier           |
-| Auth     | `storageState` session reuse via a Playwright _setup project_        |
-| CI       | GitHub Actions (`.github/workflows/playwright.yml`)                  |
+| Area     | Choice                                                       |
+| -------- | ------------------------------------------------------------- |
+| Runner   | `@playwright/test` (auto-wait, trace viewer, HTML report)     |
+| Language | TypeScript, `strict: true`                                    |
+| Browser  | Chromium (the only project configured — see §5)               |
+| Config   | `dotenv`, one file per environment (`config/<env>.env`)       |
+| Quality  | ESLint (type-aware, `typescript-eslint` `strictTypeChecked`) + Prettier |
+| CI       | GitHub Actions (`.github/workflows/playwright.yml`)           |
 
-**Assumptions**
-
-- The real system under test is not available yet. To keep the framework
-  _provably runnable_ (not an empty skeleton), the sample suites target public
-  demo endpoints: `https://the-internet.herokuapp.com` (UI) and
-  `https://jsonplaceholder.typicode.com` (API). Point `BASE_URL` / `API_URL` at
-  the real system and only the locators inside `pages/` need to change.
-- Node.js 20+ is installed (verified on Node 24).
+**Scope note:** the suite targets one public, read-only demo storefront —
+there is no login, no API layer, and no multi-environment secret to manage.
+`STORE_BASE_URL` is the only environment value the tests need, and since the
+target is public it is safe to keep directly in the CI workflow rather than
+behind a GitHub secret.
 
 ---
 
@@ -43,27 +39,22 @@ npm install
 npx playwright install          # browser binaries (add --with-deps on Linux/CI)
 ```
 
-Create your environment files (both are gitignored):
+Create your local environment file (gitignored):
 
 ```bash
-cp .env.example config/development.env         # non-secret defaults (URLs)
-cp .env.example config/development.local.env   # secrets (credentials, tokens)
+cp .env.example config/development.local.env
 ```
 
-Fill in at least:
+The only variable is:
 
-| Variable                                          | Purpose                                    |
-| ------------------------------------------------- | ------------------------------------------ |
-| `BASE_URL`                                        | Web app under test                         |
-| `API_URL`                                         | API under test                             |
-| `TEST_USERNAME` / `TEST_PASSWORD`                 | Valid account (login suite + global setup) |
-| `TEST_INVALID_USERNAME` / `TEST_INVALID_PASSWORD` | Negative login cases                       |
-| `TEST_LOCKED_*`, `TEST_ADMIN_*`                   | Optional — their tests skip when unset     |
-| `API_TOKEN`                                       | Optional bearer token for API calls        |
+| Variable         | Purpose                                                    |
+| ---------------- | ----------------------------------------------------------- |
+| `STORE_BASE_URL` | Base URL of the demo store (`https://storedemo.testdino.com`) |
 
-> **Never commit a real value.** Only `.env.example` is tracked; `.env*`,
-> `config/*.env` and `auth/*.json` are gitignored. A missing variable fails
-> loudly via `utils/env.ts#requireEnv` — tests never silently fall back.
+`config/development.env` already ships this value as a non-secret default —
+you only need `config/development.local.env` if you want to point at a
+different instance. A missing variable fails loudly via
+`utils/env.ts#requireEnv`; tests never silently fall back to a hard-coded URL.
 
 ---
 
@@ -72,20 +63,16 @@ Fill in at least:
 ```
 automation-testing/
 ├── tests/
-│   ├── auth/        login.spec.ts, logout.spec.ts     (unauthenticated UI)
-│   ├── user/        user.spec.ts                      (authenticated UI, storageState)
-│   └── api/         user-api.spec.ts                  (API only, no browser)
-├── pages/           BasePage.ts, LoginPage.ts, HomePage.ts
-├── components/      Header.ts                         (UI reused across pages)
-├── fixtures/        test.fixture.ts                   (composes POM + API client)
-├── utils/           apiClient, env, testUsers, dataGenerator, dateUtils, commonUtils
-├── test-data/       users.json (env-var references only), testData.json
-├── config/          development.env, staging.env, production.env  (gitignored)
-├── auth/            storageState.json                 (generated, gitignored)
-├── playwright/      global.setup.ts                   (login once → storageState)
-├── reports/         html report                       (gitignored)
-├── screenshots/     ad-hoc captures                   (gitignored)
-├── test-results/    failure artifacts                 (gitignored)
+│   └── e2e/wishlist/    wishlist-cart.spec.ts   (wishlist → cart flow, @smoke/@regression)
+├── pages/               BasePage, ProductsPage, WishlistPage, CartPage
+├── components/          Toast.ts                 (toast/notification assertions, reused across pages)
+├── fixtures/            test.fixture.ts           (composes the Page Objects + cart-quantity helpers)
+├── utils/               env, commonUtils, dataGenerator, dateUtils
+├── test-data/           wishlist.json             (catalog fixture data — public, no secrets)
+├── config/              development.env, staging.env, production.env   (gitignored)
+├── reports/             html report                (gitignored)
+├── screenshots/         ad-hoc captures            (gitignored)
+├── test-results/        failure artifacts          (gitignored)
 ├── playwright.config.ts, tsconfig.json, eslint.config.js, .prettierrc
 └── .github/workflows/playwright.yml
 ```
@@ -93,23 +80,20 @@ automation-testing/
 **Layering rules**
 
 - `pages/` — locators, actions and page-scoped assertions. No test-case logic.
-- `components/` — UI reused across pages (header, sidebar, modal).
+- `components/` — UI reused across pages (e.g. toast notifications).
 - `tests/` — only `test.describe` / `test` / `test.step` calling Page Objects.
   **No locators and no URLs inside a spec.**
 - `fixtures/` — composition only; not a DI framework.
-- `utils/` — pure helpers (env access, data generation, API client).
+- `utils/` — pure helpers (env access, data generation).
 
 ---
 
 ## 5. Running tests
 
 ```bash
-npm test                    # every project (setup, chromium, firefox, webkit, authenticated, api)
+npm test                    # all configured projects (chromium — see below)
 npm run test:headed
 npm run test:chromium
-npm run test:firefox
-npm run test:webkit
-npm run test:api            # API project only
 npm run test:smoke          # --grep @smoke
 npm run test:regression     # --grep @regression
 ```
@@ -121,23 +105,18 @@ TEST_ENV=staging npm test              # bash
 $env:TEST_ENV='staging'; npm test      # PowerShell
 ```
 
-Playwright projects:
-
-| Project                           | Contains                     | Session                                              |
-| --------------------------------- | ---------------------------- | ---------------------------------------------------- |
-| `setup`                           | `playwright/global.setup.ts` | logs in, writes `auth/storageState.json`             |
-| `chromium` / `firefox` / `webkit` | `tests/auth/**`              | forced clean session (login must start logged out)   |
-| `authenticated`                   | `tests/user/**`              | reuses `auth/storageState.json` (depends on `setup`) |
-| `api`                             | `tests/api/**`               | no browser                                           |
+`playwright.config.ts` also declares `firefox` and `webkit` projects
+(`npm run test:firefox` / `test:webkit`) for local cross-browser checks, but
+CI runs `chromium` only.
 
 ---
 
 ## 6. Debugging
 
 ```bash
-npm run test:debug                                  # Playwright Inspector
-npx playwright test --ui                            # UI mode (watch + time travel)
-npx playwright test tests/auth/login.spec.ts:17     # single test
+npm run test:debug                                        # Playwright Inspector
+npx playwright test --ui                                  # UI mode (watch + time travel)
+npx playwright test tests/e2e/wishlist/wishlist-cart.spec.ts:15   # single test
 npx playwright show-trace test-results/<dir>/trace.zip
 ```
 
@@ -160,52 +139,21 @@ the attached screenshot / video / trace per failure.
 
 ---
 
-## 8. API testing
-
-`utils/apiClient.ts` wraps `APIRequestContext` (`get/post/put/patch/delete`,
-`raw()` escape hatch, `dispose()`), and is exposed as the `apiClient` fixture
-initialised from `API_URL` + optional `API_TOKEN`.
-
-Every API test asserts at least: status code, content type, payload schema
-(`utils/commonUtils.ts#missingKeys`), and — where relevant — response time
-budget and negative/404 behaviour. Request bodies use
-`utils/dataGenerator.ts` so nothing unique is hard-coded.
-
----
-
-## 9. Authentication & session reuse
-
-1. `setup` project runs `playwright/global.setup.ts`, logging in through the
-   real UI with `TEST_USERNAME` / `TEST_PASSWORD`.
-2. It writes `auth/storageState.json`.
-3. The `authenticated` project consumes that state, so `tests/user/**` never
-   logs in again.
-4. The state file is regenerated on every run and **must not be cached across
-   CI pipelines**. Authenticated specs must never log out — the server-side
-   session is shared by the whole project.
-
-> Deviation from the blueprint: implemented as a Playwright _setup project_
-> (`dependencies: ['setup']`) rather than the legacy `globalSetup` hook, so the
-> login appears in the HTML report and can fail the run visibly.
-
----
-
-## 10. Coding standard
+## 8. Coding standard
 
 | Item             | Convention              | Example                                   |
-| ---------------- | ----------------------- | ----------------------------------------- |
-| Page Object file | PascalCase              | `LoginPage.ts`                            |
-| Spec file        | kebab-case + `.spec.ts` | `user-api.spec.ts`                        |
-| Function         | camelCase, verb first   | `expectErrorVisible()`                    |
-| Folder           | lowercase               | `pages/`, `test-data/`                    |
-| Test name        | readable sentence       | `'User can login with valid credentials'` |
+| ---------------- | ----------------------- | ------------------------------------------ |
+| Page Object file | PascalCase              | `WishlistPage.ts`                          |
+| Spec file        | kebab-case + `.spec.ts` | `wishlist-cart.spec.ts`                    |
+| Function         | camelCase, verb first   | `expectRowSubtotal()`                      |
+| Folder           | lowercase               | `pages/`, `test-data/`                     |
+| Test name        | readable sentence       | `'User can move a wishlist product to the cart and update its quantity'` |
 
 Locator priority: `getByRole` → `getByLabel` → `getByPlaceholder` →
-`getByText` → `getByTestId` → CSS → (avoid XPath). Ask developers for
-`data-testid` where a locator is unstable.
+`getByText` → `getByTestId` → CSS → (avoid XPath).
 
-Tags: `@smoke`, `@regression`, `@critical`, `@api`, `@ui`.
-Every test maps to an Acceptance Criterion in the file's header comment.
+Tags: `@smoke`, `@critical`, `@regression`, `@ui`.
+Every test maps to an Acceptance Criterion in the spec file's inline comments.
 
 Before every commit:
 
@@ -215,20 +163,22 @@ npm run typecheck
 npm run format
 ```
 
-> `npm run lint` uses ESLint 10 flat config — the blueprint's `--ext .ts` flag no
-> longer exists; the file globs live in `eslint.config.js`.
+> `npm run lint` uses ESLint 10 flat config — the file globs live in
+> `eslint.config.js`. `@typescript-eslint/restrict-template-expressions` is
+> configured with `allowNumber: true` since quantities/prices are routinely
+> interpolated into test-step labels.
 
 ---
 
-## 11. CI/CD
+## 9. CI/CD
 
-`.github/workflows/playwright.yml` runs on push to `main`/`develop`, on PRs and
-on manual dispatch: `npm ci` → `lint` + `typecheck` → `playwright install
---with-deps` → tests, sharded by project (`chromium`, `authenticated`, `api`).
-The HTML report and `test-results/` are uploaded as artifacts on every run.
+`.github/workflows/playwright.yml` runs on push to `main`/`develop`, on PRs
+and on manual dispatch: `npm ci` → `lint` + `typecheck` → `playwright install
+--with-deps` → `playwright test --project=chromium`. The HTML report and
+`test-results/` are uploaded as artifacts on every run.
 
-All URLs and credentials come from GitHub repository secrets
-(`STAGING_BASE_URL`, `STAGING_API_URL`, `STAGING_TEST_USERNAME`,
-`STAGING_TEST_PASSWORD`, `STAGING_TEST_INVALID_USERNAME`,
-`STAGING_TEST_INVALID_PASSWORD`, `STAGING_API_TOKEN`) — nothing is hard-coded
-in the workflow.
+`STORE_BASE_URL` is set directly in the workflow's `env:` block — it points at
+a public, credential-free demo store, so it is intentionally **not** a GitHub
+secret. If this suite is ever pointed at a real, non-public system under
+test, move that value (and any credentials) into repository secrets before
+merging.

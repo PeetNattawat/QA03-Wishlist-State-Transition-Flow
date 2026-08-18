@@ -11,7 +11,7 @@ test.describe('Wishlist & Cart', () => {
     });
     await page.reload();
   });
-// AC-1 happy-path flow.
+// happy-path flow.
   test('User can move a wishlist product to the cart and update its quantity @smoke @critical @regression @ui', async ({
     page,
     productsPage,

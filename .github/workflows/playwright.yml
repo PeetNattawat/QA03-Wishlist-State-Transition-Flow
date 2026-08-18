@@ -17,8 +17,8 @@ jobs:
         project: [chromium]
     env:
       TEST_ENV: staging
-      # All values come from GitHub repository secrets — never hard-coded here.
-      STORE_BASE_URL: ${{ secrets.STAGING_BASE_URL }}
+      # Public, credential-free demo store — not a secret, safe to hard-code.
+      STORE_BASE_URL: https://storedemo.testdino.com
     steps:
       - uses: actions/checkout@v4
 
