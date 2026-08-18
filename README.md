@@ -1,351 +1,214 @@
 # Automation Testing — Playwright + TypeScript
 
-Web UI automation for the **Wishlist → Cart** flow of a public demo store
-(`storedemo.testdino.com`). Page Object Model, strict TypeScript, zero
-credentials — the target app is credential-free.
+Web UI automation for the **Wishlist → Cart** flow of the public demo store
+`storedemo.testdino.com`. Page Object Model, strict TypeScript, no credentials
+(the target app has no login).
 
 ---
 
 ## 1. Overview
 
-| Area     | Choice                                                       |
-| -------- | ------------------------------------------------------------- |
-| Runner   | `@playwright/test` (auto-wait, trace viewer, HTML report)     |
-| Language | TypeScript, `strict: true`                                    |
-| Browser  | Chromium (the only project configured — see §5)               |
-| Config   | `dotenv`, one file per environment (`config/<env>.env`)       |
-| Quality  | ESLint (type-aware, `typescript-eslint` `strictTypeChecked`) + Prettier |
-| CI       | GitHub Actions (`.github/workflows/playwright.yml`)           |
+| Area     | Choice                                                  |
+| -------- | ------------------------------------------------------- |
+| Runner   | `@playwright/test`                                      |
+| Language | TypeScript (`strict: true`)                             |
+| Browsers | chromium, firefox, webkit — **CI runs chromium only**   |
+| Config   | `dotenv`, one file per environment (`config/<env>.env`) |
+| Quality  | ESLint (type-aware) + Prettier                          |
+| CI       | GitHub Actions (`.github/workflows/playwright.yml`)     |
 
-**Scope note:** the suite targets one public, read-only demo storefront —
-there is no login, no API layer, and no multi-environment secret to manage.
-`STORE_BASE_URL` is the only environment value the tests need, and since the
-target is public it is safe to keep directly in the CI workflow rather than
-behind a GitHub secret.
+`STORE_BASE_URL` is the only variable the tests need. The target is public, so
+it is not a secret.
 
 ---
 
 ## 2. Prerequisites
 
-| Tool          | Required                | Check                            |
-| ------------- | ----------------------- | -------------------------------- |
-| Node.js       | **>= 20** (`engines`)   | `node -v`                        |
-| npm           | ships with Node         | `npm -v`                         |
-| Git           | any recent version      | `git --version`                  |
-| Disk          | ~500 MB for browsers    | —                                |
-
-```bash
-node -v          # >= 20
-npm -v
-git --version
-```
-
-The package manager is **npm** — the repo contains `package-lock.json` and CI
-runs `npm ci`. Do not use yarn/pnpm; a second lockfile will drift from CI.
+- **Node.js >= 20** (`node -v`) — enforced by `engines`
+- **npm** (`npm -v`) — the repo has `package-lock.json` and CI runs `npm ci`.
+  Do not use yarn/pnpm.
+- ~500 MB free disk for browser binaries
 
 ---
 
-## 3. Getting started / Setup
+## 3. Setup
 
-### 3.1 Clone the repository
-
-```bash
-git clone https://github.com/PeetNattawat/QA03-Wishlist-State-Transition-Flow.git
-cd QA03-Wishlist-State-Transition-Flow
-```
-
-Default branch is `main`.
-
-> **Note on folder layout:** this Git repository's root **is** the automation
-> suite itself (`package.json`, `playwright.config.ts` and `tests/` sit at the
-> top level). A fresh clone therefore gives you a folder named
-> `QA03-Wishlist-State-Transition-Flow`, and every command in this README runs
-> from that folder. Inside Peet's Emma workspace the same content is checked
-> out at `automation-testing/`, so there you run `cd automation-testing`
-> instead — there is no extra nested sub-folder to descend into in either case.
-
-Verify you are in the right place before continuing:
-
-```bash
-ls package.json playwright.config.ts tests
-```
-
-### 3.2 Quick start (recommended)
-
-Two commands take a fresh clone to a runnable suite:
+### 3.1 Quick start
 
 ```bash
 npm install
 npm run setup
 ```
 
-`npm run setup` (`scripts/setup.js`) performs §3.3 and §3.4 for you:
+`npm run setup` (`scripts/setup.js`) does two things:
 
-1. creates `config/<TEST_ENV>.env` from `.env.example` and fills in the
-   non-secret default `STORE_BASE_URL=https://storedemo.testdino.com`;
-2. installs the Playwright browser binaries (`npx playwright install`).
+1. creates `config/development.env` with `STORE_BASE_URL=https://storedemo.testdino.com`
+2. installs the Playwright browser binaries
 
-It is **safe to re-run**: an existing `config/<env>.env` is never overwritten,
-it is reported as `[SKIP]` and your own values are preserved.
+Safe to re-run — an existing config file is reported `[SKIP]` and never
+overwritten.
 
-| Flag / variable          | Effect                                                                     |
-| ------------------------ | -------------------------------------------------------------------------- |
-| `--chromium-only`        | Install only the browser CI uses. Faster, but plain `npm test` (which also runs firefox/webkit) will then fail — use `npm run test:chromium`. |
-| `--with-deps`            | Also install the OS-level browser libraries. Required on most Linux/CI images. |
-| `--skip-browsers`        | Only create the env file.                                                   |
-| `TEST_ENV=staging`       | Create `config/staging.env` instead. No non-secret default exists for staging/production, so `STORE_BASE_URL` is left blank and the script warns you to fill it in. |
+Optional flags (note the `--` before script flags):
 
 ```bash
-npm run setup -- --chromium-only        # note the "--" before script flags
-npm run setup -- --with-deps            # Linux / CI
+npm run setup -- --chromium-only     # only the browser CI uses (faster)
+npm run setup -- --with-deps         # also install OS libs (Linux / CI)
+npm run setup -- --skip-browsers     # env file only
+TEST_ENV=staging npm run setup       # create config/staging.env instead
 ```
 
-Verify with §3.5, or read on for what the script does by hand.
+Only `development` has a built-in default URL; for staging/production the
+script leaves `STORE_BASE_URL` blank for you to fill in.
 
-### 3.3 Manual alternative — install dependencies
+### 3.2 Verify it worked
 
 ```bash
-npm install                     # dev deps (local development)
-# or, for a reproducible lockfile-exact install (what CI does):
-# npm ci
-
-npx playwright install          # browser binaries — required, not installed by npm
+npm run test:smoke      # expect 3 passed (1 smoke test x 3 browsers)
+npm run test:chromium   # expect 9 passed
+npm run report          # open the HTML report
 ```
 
-- `npm install` only installs `@playwright/test`; the actual Chromium/Firefox/WebKit
-  binaries come from `npx playwright install` and are cached outside the repo.
-- On Linux/CI add the system libraries too: `npx playwright install --with-deps`.
-- To save time and disk you can install just the browser CI uses:
-  `npx playwright install chromium`.
+With `--chromium-only`, use `npm run test:smoke -- --project=chromium`
+(1 passed).
 
-### 3.4 Manual alternative — create your environment config
-
-> Skip this section if you ran `npm run setup` — it is exactly what the script
-> automates. Read it to understand what was generated, or when you need an
-> environment other than `development`.
-
-**Every file in `config/` is gitignored** (`.gitignore`: `config/*.env`,
-`config/*.local.env`) — only `.env.example` is committed. Git cannot track an
-empty directory either, so a fresh clone has **no `config/` folder at all** and
-the tests have no `baseURL` until you create one. This step is mandatory, not
-optional.
+### 3.3 Manual fallback (if you skip `npm run setup`)
 
 ```bash
-mkdir -p config                                 # bash / Git Bash
+npm install
+npx playwright install                # browsers; add --with-deps on Linux
+mkdir -p config                       # PowerShell: New-Item -ItemType Directory -Force config
 cp .env.example config/development.env
-
-md config                                       # cmd
-copy .env.example config\development.env
-
-New-Item -ItemType Directory -Force config      # PowerShell
-Copy-Item .env.example config\development.env
 ```
 
-Then open `config/development.env` and fill in the value — `.env.example` ships
-`STORE_BASE_URL` **blank** on purpose:
+Then fill in `config/development.env`:
 
 ```dotenv
 TEST_ENV=development
 STORE_BASE_URL=https://storedemo.testdino.com
 ```
 
-| Variable         | Required | Secret | Purpose                                                                                     |
-| ---------------- | -------- | ------ | ------------------------------------------------------------------------------------------- |
-| `STORE_BASE_URL` | ✅ yes   | no     | Base URL of the demo store. Public, credential-free instance: `https://storedemo.testdino.com` |
-| `TEST_ENV`       | no       | no     | Which `config/<env>` pair to load. Defaults to `development` when unset.                     |
+Notes:
 
-There are **no credentials** to configure: the system under test has no login,
-no API layer and no tokens. If this suite is ever repointed at a real system,
-put credentials in `config/<env>.local.env` (also gitignored) or CI secrets —
-never in `config/<env>.env`, and never in source.
+- All of `config/*.env` is gitignored, so a fresh clone has **no `config/`
+  folder at all** — creating it is mandatory.
+- Load order, first value wins: real env / CI → `config/<env>.local.env`
+  (secrets) → `config/<env>.env`.
+- A missing or blank variable fails loudly via `utils/env.ts#requireEnv` —
+  no silent fallback URL.
 
-**Resolution order** (first value wins — `dotenv` never overwrites an
-already-defined variable, see `playwright.config.ts`):
+### 3.4 Troubleshooting
 
-1. real process environment / CI secrets
-2. `config/<TEST_ENV>.local.env` — local secrets
-3. `config/<TEST_ENV>.env` — per-env, non-secret defaults
-
-A missing or blank variable fails loudly via `utils/env.ts#requireEnv`; tests
-never silently fall back to a hard-coded URL.
-
-`config/staging.env` and `config/production.env` follow the same pattern but
-ship `STORE_BASE_URL=` **empty** — fill them in only when you actually have a
-staging/production target. (Production is read-only/smoke suites only.)
-
-### 3.5 First run — verify the setup
-
-Run the smoke test first; it is the fastest end-to-end proof that Node, the
-browsers and the environment config are all wired correctly:
-
-```bash
-npm run test:smoke
-```
-
-Expected: **3 passed** — one `@smoke @critical` wishlist → cart journey, run
-once per browser project (chromium + firefox + webkit). With
-`npm run setup -- --chromium-only` you have only one browser installed, so use
-`npm run test:smoke -- --project=chromium` instead (**1 passed**).
-
-Then run the whole suite on the CI browser:
-
-```bash
-npm run test:chromium
-```
-
-Expected: **9 passed** (one spec file, `tests/e2e/wishlist/wishlist-cart.spec.ts`).
-Plain `npm test` runs the same 9 tests across all three browser projects
-(chromium + firefox + webkit = 27) — see §5.
-
-Open the report to confirm reporting works:
-
-```bash
-npm run report
-```
-
-Finally, confirm the static-quality toolchain runs clean:
-
-```bash
-npm run typecheck && npm run lint
-```
-
-### 3.6 Setup troubleshooting
-
-| Symptom                                                                    | Cause                                                                   | Fix                                                                       |
-| -------------------------------------------------------------------------- | ----------------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| `Missing required environment variable "STORE_BASE_URL"`                    | `config/<env>.env` missing or the value is blank                        | Run `npm run setup` (or redo §3.4) — the file is gitignored, a clone never contains it |
-| `npm run setup` reports `Could not resolve @playwright/test`                | `npm install` has not been run yet                                       | `npm install`, then `npm run setup`                                        |
-| `npm run setup` says `[SKIP] … already exists` but the value is still wrong | The script never overwrites your file, by design                        | Edit `config/<env>.env` by hand, or delete it and re-run `npm run setup`   |
-| Every test fails on navigation / `page.goto: Invalid URL`                   | `baseURL` is `undefined` because `STORE_BASE_URL` never loaded          | Check the filename matches `TEST_ENV` exactly (`development.env`, not `.env`) |
-| `browserType.launch: Executable doesn't exist`                              | `npx playwright install` was skipped                                     | `npx playwright install` (`--with-deps` on Linux)                          |
-| `npm error engine … required: { node: '>=20' }`                             | Node too old                                                             | Install Node 20 LTS or newer                                               |
-| Tests pass locally but fail in CI                                           | CI uses `TEST_ENV: staging` with `STORE_BASE_URL` from the workflow `env:` | See §9 — keep the workflow value in sync                                   |
-| `eslint . --ext .ts` style command errors                                   | ESLint 10 is flat-config only                                            | Use `npm run lint`; globs live in `eslint.config.js`                       |
+| Symptom                                                  | Fix                                                                                           |
+| -------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `Missing required environment variable "STORE_BASE_URL"` | Run `npm run setup`, or check the filename matches `TEST_ENV` (`development.env`, not `.env`) |
+| `browserType.launch: Executable doesn't exist`           | `npx playwright install` (`--with-deps` on Linux)                                             |
+| `Could not resolve @playwright/test` during setup        | Run `npm install` first                                                                       |
+| Setup says `[SKIP]` but the value is wrong               | Edit `config/<env>.env` by hand, or delete it and re-run                                      |
+| `npm error engine … node: '>=20'`                        | Install Node 20 LTS or newer                                                                  |
 
 ---
 
 ## 4. Project structure
 
 ```
-automation-testing/
-├── tests/
-│   └── e2e/wishlist/    wishlist-cart.spec.ts   (wishlist → cart flow, @smoke/@regression)
-├── pages/               BasePage, ProductsPage, WishlistPage, CartPage
-├── components/          Toast.ts                 (toast/notification assertions, reused across pages)
-├── fixtures/            test.fixture.ts           (composes the Page Objects + cart-quantity helpers)
-├── utils/               env, commonUtils, dataGenerator, dateUtils
-├── scripts/             setup.js                  (npm run setup — env file + browsers)
-├── test-data/           wishlist.json             (catalog fixture data — public, no secrets)
-├── config/              development.env, staging.env, production.env   (gitignored)
-├── reports/             html report                (gitignored)
-├── screenshots/         ad-hoc captures            (gitignored)
-├── test-results/        failure artifacts          (gitignored)
-├── playwright.config.ts, tsconfig.json, eslint.config.js, .prettierrc
-└── .github/workflows/playwright.yml
+tests/e2e/wishlist/   wishlist-cart.spec.ts  (@smoke / @regression)
+pages/                BasePage, ProductsPage, WishlistPage, CartPage
+components/           Toast.ts               (shared UI assertions)
+fixtures/             test.fixture.ts        (composes the Page Objects)
+utils/                env, commonUtils, dataGenerator, dateUtils
+scripts/setup.js      npm run setup
+test-data/            wishlist.json          (public fixture data)
+config/               <env>.env              (gitignored)
+reports/ screenshots/ test-results/          (gitignored)
+playwright.config.ts, tsconfig.json, eslint.config.js, .prettierrc
+.github/workflows/playwright.yml
 ```
 
 **Layering rules**
 
-- `pages/` — locators, actions and page-scoped assertions. No test-case logic.
-- `components/` — UI reused across pages (e.g. toast notifications).
+- `pages/` — locators, actions, page-scoped assertions. No test-case logic.
 - `tests/` — only `test.describe` / `test` / `test.step` calling Page Objects.
-  **No locators and no URLs inside a spec.**
-- `fixtures/` — composition only; not a DI framework.
-- `utils/` — pure helpers (env access, data generation).
+  **No locators, no URLs in a spec.**
+- `components/` — UI reused across pages. `fixtures/` — composition only.
+  `utils/` — pure helpers.
 
 ---
 
 ## 5. Running tests
 
 ```bash
-npm test                    # all configured projects (chromium — see below)
+npm test                 # all browser projects
+npm run test:chromium    # or test:firefox / test:webkit
 npm run test:headed
-npm run test:chromium
-npm run test:smoke          # --grep @smoke
-npm run test:regression     # --grep @regression
+npm run test:smoke       # --grep @smoke
+npm run test:regression  # --grep @regression
 ```
 
 Switch environment without touching code:
 
 ```bash
-TEST_ENV=staging npm test              # bash
-$env:TEST_ENV='staging'; npm test      # PowerShell
+TEST_ENV=staging npm test           # bash
+$env:TEST_ENV='staging'; npm test   # PowerShell
 ```
-
-`playwright.config.ts` also declares `firefox` and `webkit` projects
-(`npm run test:firefox` / `test:webkit`) for local cross-browser checks, but
-CI runs `chromium` only.
 
 ---
 
 ## 6. Debugging
 
 ```bash
-npm run test:debug                                        # Playwright Inspector
-npx playwright test --ui                                  # UI mode (watch + time travel)
-npx playwright test tests/e2e/wishlist/wishlist-cart.spec.ts:15   # single test
+npm run test:debug                                       # Inspector
+npx playwright test --ui                                 # UI mode
+npx playwright test tests/e2e/wishlist/wishlist-cart.spec.ts:15
 npx playwright show-trace test-results/<dir>/trace.zip
 ```
 
-On failure the config captures automatically: **screenshot**
-(`only-on-failure`), **video** (`retain-on-failure`) and **trace**
-(`retain-on-failure`) into `test-results/<test-dir>/`.
-
-`waitForTimeout()` is banned by ESLint — use web-first `expect()` assertions.
+On failure the config auto-captures screenshot, video and trace into
+`test-results/<test-dir>/`. `waitForTimeout()` is banned by ESLint — use
+web-first `expect()` assertions.
 
 ---
 
 ## 7. Reporting
 
 ```bash
-npm run report        # serves reports/html
+npm run report     # serves reports/html
 ```
 
-The HTML report shows passed/failed/skipped, duration, every `test.step`, and
-the attached screenshot / video / trace per failure.
+Shows pass/fail/skip, duration, every `test.step`, and the screenshot / video /
+trace attached to each failure.
 
 ---
 
 ## 8. Coding standard
 
-| Item             | Convention              | Example                                   |
-| ---------------- | ----------------------- | ------------------------------------------ |
-| Page Object file | PascalCase              | `WishlistPage.ts`                          |
-| Spec file        | kebab-case + `.spec.ts` | `wishlist-cart.spec.ts`                    |
-| Function         | camelCase, verb first   | `expectRowSubtotal()`                      |
-| Folder           | lowercase               | `pages/`, `test-data/`                     |
-| Test name        | readable sentence       | `'User can move a wishlist product to the cart and update its quantity'` |
+| Item             | Convention              | Example                                          |
+| ---------------- | ----------------------- | ------------------------------------------------ |
+| Page Object file | PascalCase              | `WishlistPage.ts`                                |
+| Spec file        | kebab-case + `.spec.ts` | `wishlist-cart.spec.ts`                          |
+| Function         | camelCase, verb first   | `expectRowSubtotal()`                            |
+| Folder           | lowercase               | `pages/`, `test-data/`                           |
+| Test name        | readable sentence       | `'User can move a wishlist product to the cart'` |
 
-Locator priority: `getByRole` → `getByLabel` → `getByPlaceholder` →
-`getByText` → `getByTestId` → CSS → (avoid XPath).
+- Locator priority: `getByRole` → `getByLabel` → `getByPlaceholder` →
+  `getByText` → `getByTestId` → CSS → (avoid XPath).
+- Tags: `@smoke`, `@critical`, `@regression`, `@ui`.
+- Every test maps to an Acceptance Criterion in the spec's inline comments.
 
-Tags: `@smoke`, `@critical`, `@regression`, `@ui`.
-Every test maps to an Acceptance Criterion in the spec file's inline comments.
-
-Before every commit:
+Before committing:
 
 ```bash
-npm run lint
-npm run typecheck
-npm run format
+npm run lint && npm run typecheck && npm run format
 ```
-
-> `npm run lint` uses ESLint 10 flat config — the file globs live in
-> `eslint.config.js`. `@typescript-eslint/restrict-template-expressions` is
-> configured with `allowNumber: true` since quantities/prices are routinely
-> interpolated into test-step labels.
 
 ---
 
 ## 9. CI/CD
 
-`.github/workflows/playwright.yml` runs on push to `main`/`develop`, on PRs
-and on manual dispatch: `npm ci` → `lint` + `typecheck` → `playwright install
+`.github/workflows/playwright.yml` runs on push to `main`/`develop`, on PRs and
+on manual dispatch: `npm ci` → `lint` + `typecheck` → `playwright install
 --with-deps` → `playwright test --project=chromium`. The HTML report and
-`test-results/` are uploaded as artifacts on every run.
+`test-results/` are uploaded as artifacts.
 
-`STORE_BASE_URL` is set directly in the workflow's `env:` block — it points at
-a public, credential-free demo store, so it is intentionally **not** a GitHub
-secret. If this suite is ever pointed at a real, non-public system under
-test, move that value (and any credentials) into repository secrets before
-merging.
+`STORE_BASE_URL` is set in the workflow `env:` block — intentionally not a
+GitHub secret, since the store is public. If this suite is ever pointed at a
+real system, move that value and any credentials into repository secrets first.
