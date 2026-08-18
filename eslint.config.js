@@ -54,6 +54,8 @@ module.exports = tseslint.config(
           message: 'Do not use waitForTimeout() — use a web-first expect()/waitFor assertion.',
         },
       ],
+      // Numbers are safe to interpolate directly (quantities/prices in test labels, etc.).
+      '@typescript-eslint/restrict-template-expressions': ['error', { allowNumber: true }],
       eqeqeq: ['error', 'always'],
       'no-console': ['warn', { allow: ['warn', 'error'] }],
     },
