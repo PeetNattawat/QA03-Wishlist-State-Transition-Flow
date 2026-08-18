@@ -3,13 +3,18 @@
   "productA": {
     "name": "Rode NT1-A Condenser Mic",
     "price": 240,
-    "path": "/product/rode-nt1-a-condenser-mic"
+    "path": "/product/rode-nt1-a-condenser-mic",
+    "increaseCartQuantity": 1,
+    "decreaseCartQuantity": 1
   },
   "productB": {
     "name": "JBL Charge 4 Bluetooth Speaker",
     "price": 145,
-    "path": "/product/jbl-charge-4-bluetooth-speaker"
+    "path": "/product/jbl-charge-4-bluetooth-speaker",
+    "increaseCartQuantity": 2,
+    "decreaseCartQuantity": 1
   },
+  
   "messages": {
     "addedToWishlist": "Added to the wishlist",
     "removedFromWishlist": "Removed from wishlist",

@@ -74,6 +74,29 @@ export class CartPage extends BasePage {
     await this.decrementButton(productName).click();
   }
 
+  /**
+   * Sets the quantity of `productName` to `targetQuantity` by repeatedly clicking
+   * +/-, since the app renders quantity as text with no editable input field.
+   * Waits for each click's UI update before the next, so the run stays in sync
+   * even if the app debounces the subtotal recalculation.
+   */
+  async setQuantity(productName: string, targetQuantity: number): Promise<void> {
+    if (targetQuantity < 1) {
+      throw new Error(`setQuantity: targetQuantity must be >= 1, got ${targetQuantity}`);
+    }
+    let current = Number(await this.quantity(productName).innerText());
+    while (current !== targetQuantity) {
+      if (current < targetQuantity) {
+        await this.increaseQuantity(productName);
+        current += 1;
+      } else {
+        await this.decreaseQuantity(productName);
+        current -= 1;
+      }
+      await expect(this.quantity(productName)).toHaveText(String(current));
+    }
+  }
+
   /** Removes `productName` from the cart. */
   async removeItem(productName: string): Promise<void> {
     await this.removeButton(productName).click();
@@ -109,6 +132,35 @@ export class CartPage extends BasePage {
   async expectOrderSummary(amount: number): Promise<void> {
     await expect(this.summarySubtotal).toHaveText(formatUsd(amount));
     await expect(this.summaryTotal).toHaveText(formatUsd(amount));
+  }
+
+  /**
+   * Asserts `productName`'s quantity, row subtotal (unitPrice × quantity), and the
+   * order summary all agree — the standard set of checks after setQuantity/increaseQuantity/
+   * decreaseQuantity change the cart state.
+   */
+  async expectQuantityAndTotals(
+    productName: string,
+    quantity: number,
+    unitPrice: number
+  ): Promise<void> {
+    await this.expectQuantity(productName, quantity);
+    await this.expectRowSubtotal(productName, unitPrice * quantity);
+    await this.expectOrderSummary(unitPrice * quantity);
+  }
+
+  /**
+   * Sets `productName`'s quantity to `targetQuantity` and asserts quantity, row
+   * subtotal, and order summary all agree — so the target quantity is written once
+   * instead of once per call.
+   */
+  async setQuantityAndVerify(
+    productName: string,
+    targetQuantity: number,
+    unitPrice: number
+  ): Promise<void> {
+    await this.setQuantity(productName, targetQuantity);
+    await this.expectQuantityAndTotals(productName, targetQuantity, unitPrice);
   }
 
   /** Asserts the empty-state message is shown and no line items are rendered. */

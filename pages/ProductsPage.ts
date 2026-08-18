@@ -17,6 +17,13 @@ export class ProductsPage extends BasePage {
       .filter({ has: page.getByTestId('all-products-header') });
   }
 
+  /** Lands on the storefront home page first, then clicks through to Products — mirrors a real visitor's path instead of deep-linking. */
+  override async goto(): Promise<void> {
+    await this.page.goto(storeBaseUrl());
+    await this.page.getByRole('link', { name: 'Shop Now' }).first().click();
+    await this.page.waitForURL('**/products');
+  }
+
   /** The card (product link) of `productName`. */
   productCard(productName: string): Locator {
     return this.productCards.filter({ hasText: productName });

@@ -27,7 +27,7 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   reporter: [['html', { outputFolder: 'reports/html', open: 'never' }], ['list']],
   use: {
-    baseURL: process.env.BASE_URL,
+    baseURL: process.env.STORE_BASE_URL,
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
     trace: 'retain-on-failure',
