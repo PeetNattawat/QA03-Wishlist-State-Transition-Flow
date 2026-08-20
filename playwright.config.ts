@@ -33,6 +33,7 @@ export default defineConfig({
     trace: 'retain-on-failure',
     actionTimeout: 10_000,
     navigationTimeout: 15_000,
+    launchOptions: { slowMo: 0 },
   },
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
